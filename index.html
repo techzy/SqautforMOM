@@ -1,0 +1,838 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Squat Coach">
+<meta name="theme-color" content="#000000">
+<title>Squat Coach</title>
+<style>
+  :root {
+    --bg: #000; --panel: #1c1c1e; --line: #3a3a3c; --text: #fff; --muted: #c7c7cc;
+    --accent: #ffd60a; --accent-text: #000; --good: #30d158; --mid: #ffd60a; --bad: #ff6961;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 24px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-text-size-adjust: 100%; }
+  .hidden { display: none !important; }
+  .screen { min-height: 100%; padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 32px); }
+  h1 { font-size: 40px; margin: 8px 0 8px; line-height: 1.15; }
+  h2 { font-size: 30px; margin: 28px 0 10px; }
+  p { margin: 10px 0; }
+  button { display: block; width: 100%; min-height: 84px; padding: 18px; margin: 14px 0; border: 3px solid transparent; border-radius: 18px;
+    background: var(--panel); color: var(--text); font: inherit; font-size: 30px; font-weight: 700; text-align: center; }
+  button.primary { background: var(--accent); color: var(--accent-text); }
+  button.huge { min-height: 140px; font-size: 44px; }
+  button.danger { background: #3a1517; color: #ffb4b0; }
+  button:active { filter: brightness(1.3); }
+  .card { background: var(--panel); border-radius: 18px; padding: 18px; margin: 14px 0; }
+  .muted { color: var(--muted); }
+  .status { font-size: 24px; color: var(--muted); text-align: center; margin: 8px 0 18px; }
+  .big-num { font-size: 56px; font-weight: 800; line-height: 1.1; }
+  .s-g { color: var(--good); } .s-m { color: var(--mid); } .s-b { color: var(--bad); }
+  .stats { display: flex; gap: 12px; } .stats > div { flex: 1; }
+  label.field { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+  label.field small { display: block; color: var(--muted); font-size: 20px; }
+  select, input[type=number] { background: #000; color: var(--text); border: 2px solid var(--line); border-radius: 12px; padding: 10px; font: inherit; font-size: 24px; max-width: 170px; }
+  input[type=checkbox] { width: 40px; height: 40px; flex: none; }
+  .rep { padding: 14px 0 4px; border-top: 1px solid var(--line); }
+  .card button { background: #2c2c2e; border-color: #636366; }
+  .rep button { min-height: 64px; padding: 10px 14px; margin: 10px 0 6px; font-size: 24px; }
+
+  /* Squat screen */
+  #squat { padding: 0; position: fixed; inset: 0; background: #000; }
+  .stage { position: absolute; inset: 0; border: 8px solid #555; transition: border-color .2s; }
+  .stage.seen { border-color: var(--good); } .stage.notseen { border-color: var(--bad); }
+  .stage video, .stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .mirror { transform: scaleX(-1); }
+  .top { position: absolute; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 12px) 16px 16px;
+    text-align: center; background: linear-gradient(#000e, #0000); pointer-events: none; }
+  #repCount { font-size: 140px; font-weight: 900; line-height: 1; }
+  #repLbl { font-size: 26px; color: #e5e5ea; }
+  #volume { background: var(--accent); color: #000; font-weight: 800; font-size: 30px; border-radius: 16px; padding: 10px; margin: 10px 0 0; }
+  #debug { position: absolute; left: 16px; top: calc(env(safe-area-inset-top) + 190px); font: 14px/1.35 ui-monospace, Menlo, monospace;
+    background: #000a; padding: 6px 8px; border-radius: 8px; white-space: pre; pointer-events: none; }
+  .bottom { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
+    background: linear-gradient(#0000, #000e 30%); }
+  #cue { font-size: 46px; font-weight: 900; text-align: center; min-height: 60px; line-height: 1.15; }
+  #squatStatus { text-align: center; color: #e5e5ea; font-size: 26px; min-height: 36px; margin: 6px 0; }
+  #setDoneBtn { margin: 6px 0 0; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 32px; background: #000d; }
+  #toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 24px); text-align: center;
+    background: #333; padding: 16px; border-radius: 14px; font-size: 24px; z-index: 50; }
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home" class="screen">
+  <h1>Squat Coach</h1>
+  <button class="primary huge" id="startBtn">Start</button>
+  <button id="historyBtn">History</button>
+  <button id="goodRepBtn">Record a good rep</button>
+  <p class="status" id="usingLine"></p>
+  <div class="card hidden" id="a2hsCard">
+    <b>Keep your history safe</b>
+    <p class="muted">In Safari, tap Share, then <b>Add to Home Screen</b>. Open Squat Coach from that icon.</p>
+  </div>
+  <div class="card muted">
+    <b style="color:var(--text)">How to use</b>
+    <p>1. Put the phone on the floor or a bench, side-on to you.</p>
+    <p>2. Step back until your whole body, head to feet, is in the picture.</p>
+    <p>3. Tap Start. Stand tall and still until it says "Ready".</p>
+    <p>4. Squat. After each squat you'll hear one tip.</p>
+  </div>
+  <button id="settingsBtn">Settings</button>
+</div>
+
+<!-- GOOD REP HELP -->
+<div id="goodRep" class="screen hidden">
+  <h1>Record a good rep</h1>
+  <p>Your squats are scored against a <b>good rep</b> of yours.</p>
+  <p>To choose one: open <b>History</b>, pick a session, and tap <b>Use as my good rep</b> next to a squat or a set you were happy with.</p>
+  <p id="goodRepNow" class="muted"></p>
+  <button class="primary" id="goodRepHistBtn">Open History</button>
+  <button class="backBtn">Back</button>
+</div>
+
+<!-- SQUAT -->
+<div id="squat" class="screen hidden">
+  <div class="stage" id="stage">
+    <video id="video" playsinline muted autoplay></video>
+    <canvas id="canvas"></canvas>
+  </div>
+  <div class="top">
+    <div id="repCount">0</div>
+    <div id="repLbl">reps</div>
+    <div id="volume" class="hidden">Turn your volume up</div>
+  </div>
+  <div id="debug" class="hidden"></div>
+  <div class="bottom">
+    <div id="cue"></div>
+    <div id="squatStatus"></div>
+    <button class="primary huge" id="setDoneBtn">Set done</button>
+  </div>
+  <div id="loading" class="hidden">Getting ready…</div>
+</div>
+
+<!-- SET SUMMARY -->
+<div id="summary" class="screen hidden">
+  <h1 id="sumTitle">Set done</h1>
+  <div id="sumBody"></div>
+  <button class="primary huge" id="nextSetBtn">Next set</button>
+  <button id="finishBtn">Finish</button>
+</div>
+
+<!-- HISTORY -->
+<div id="history" class="screen hidden">
+  <h1>History</h1>
+  <div id="historyBody"></div>
+  <button class="backBtn">Back</button>
+</div>
+
+<!-- SESSION DETAIL -->
+<div id="detail" class="screen hidden">
+  <h1 id="detailTitle">Session</h1>
+  <div id="detailBody"></div>
+  <button id="detailBack">Back</button>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="screen hidden">
+  <h1>Settings</h1>
+  <div id="settingsBody"></div>
+  <button id="advancedBtn">Advanced</button>
+  <div id="advancedBody" class="hidden"></div>
+  <h2>Data</h2>
+  <button id="clearRefBtn">Reset good rep</button>
+  <button id="exportBtn">Export data</button>
+  <button class="danger" id="clearAllBtn">Delete all data</button>
+  <button class="backBtn">Back</button>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script type="module">
+// ======================= ANALYSIS-START (pure logic, no DOM) =======================
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+const std = a => { const m = mean(a); return Math.sqrt(mean(a.map(x => (x - m) ** 2))); };
+const median = a => { const s = [...a].sort((x, y) => x - y); const n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; };
+const vis = p => (p.visibility == null ? 1 : p.visibility);
+const fin = Number.isFinite;
+
+// MediaPipe Pose landmark indices for one side of the body ('left' = her left).
+function sideIdx(side) {
+  const l = side === 'left';
+  return { sh: l ? 11 : 12, hip: l ? 23 : 24, knee: l ? 25 : 26, ank: l ? 27 : 28, heel: l ? 29 : 30, toe: l ? 31 : 32 };
+}
+
+// The side nearest the camera is the one MediaPipe sees best.
+function nearSide(lm) {
+  const sum = side => Object.values(sideIdx(side)).reduce((s, i) => s + vis(lm[i]), 0);
+  return sum('left') >= sum('right') ? 'left' : 'right';
+}
+
+// Angle at b (degrees) in the image plane.
+function angle2(a, b, c) {
+  const v1x = a.x - b.x, v1y = a.y - b.y, v2x = c.x - b.x, v2y = c.y - b.y;
+  const n = Math.hypot(v1x, v1y) * Math.hypot(v2x, v2y) || 1;
+  return Math.acos(clamp((v1x * v2x + v1y * v2y) / n, -1, 1)) * 180 / Math.PI;
+}
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+// Body bounding box (shoulders down), with x scaled by aspect so units match y.
+function bbox(lm, aspect) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 11; i < lm.length && i <= 32; i++) {
+    const x = lm[i].x * aspect, y = lm[i].y;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return { cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, h: y1 - y0 };
+}
+
+// Choose which detected person is her. With no lock yet: the biggest person.
+// With a lock: the person of similar size nearest where she was. Others (mirror reflections,
+// other gym-goers) are ignored. Returns an index into poses, or -1.
+function pickPose(poses, target, aspect, { lost = false } = {}) {
+  const boxes = poses.map((lm, i) => ({ i, b: bbox(lm, aspect) })).filter(o => o.b.h > 0.05);
+  if (!boxes.length) return -1;
+  if (!target) return boxes.reduce((best, o) => (o.b.h > best.b.h ? o : best)).i;
+  let best = -1, bestD = Infinity;
+  for (const { i, b } of boxes) {
+    const sizeOff = Math.abs(b.h - target.h) / target.h;
+    if (sizeOff > 0.35) continue;
+    const d = lost ? sizeOff : Math.hypot(b.cx - target.cx, b.cy - target.cy) / target.h;
+    if (!lost && d > 0.6) continue;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+
+const DEFAULT_OPTS = {
+  side: 'auto', aspect: 1, calibMs: 1500, visMin: 0.5, smooth: 0.5,
+  enterDrop: 0.15, exitDrop: 0.07, minRepMs: 600, maxRepMs: 10000, lockoutMs: 1000, lostMs: 1500,
+};
+
+class Analyzer {
+  constructor(o = {}) { this.o = { ...DEFAULT_OPTS, ...o }; this.target = null; this.lastSeen = null; this.lost = false; this.startCalibration(); }
+
+  startCalibration(recal = false) {
+    this.state = 'calibrating'; this.base = null; this.calib = []; this.calibProgress = 0; this.recal = recal;
+    this.rep = null; this.sig = null; this.top = { sig: Infinity, t: 0 }; this.live = { state: 'calibrating' };
+    if (!recal) this.target = null;
+  }
+
+  // poses: array of landmark arrays (one per detected person). t: ms. Returns an array of events:
+  // {type:'calibrated', side, recal} | {type:'rep', metrics} | {type:'discard', reason} | {type:'lost'} | {type:'found'}
+  push(poses, t) {
+    const ev = [];
+    this.lastIdx = -1;
+    const i = poses && poses.length ? pickPose(poses, this.target, this.o.aspect, { lost: this.lost }) : -1;
+    if (i < 0) { this.missing(t, ev); return ev; }
+    this.lastIdx = i;
+    const lm = poses[i], b = bbox(lm, this.o.aspect);
+    if (!this.target || this.state === 'calibrating') this.target = b;
+    else { const k = 0.3; this.target = { cx: this.target.cx + (b.cx - this.target.cx) * k, cy: this.target.cy + (b.cy - this.target.cy) * k, h: this.target.h + (b.h - this.target.h) * k }; }
+    this.lastSeen = t;
+    if (this.lost) { this.lost = false; ev.push({ type: 'found' }); }
+    this.frame(lm, t, ev);
+    return ev;
+  }
+
+  missing(t, ev) {
+    this.live = { state: this.state + ' (not seen)' };
+    if (this.state === 'calibrating') { this.calib = []; this.calibProgress = 0; }
+    if (!this.lost && this.lastSeen != null && t - this.lastSeen > this.o.lostMs) {
+      this.lost = true;
+      if (this.state === 'lockout') this.finishRep(ev);
+      else if (this.state === 'active') { this.rep = null; this.state = 'idle'; ev.push({ type: 'discard', reason: 'lost from view' }); }
+      if (this.state === 'calibrating') this.target = null;
+      ev.push({ type: 'lost' });
+    }
+  }
+
+  features(lm) {
+    const S = sideIdx(this.side || nearSide(lm)), a = this.o.aspect, F = {};
+    for (const [k, idx] of Object.entries(S)) {
+      const p = lm[idx];
+      F[k] = vis(p) >= this.o.visMin ? { x: p.x * a, y: p.y } : null;
+    }
+    return F;
+  }
+
+  frame(lm, t, ev) {
+    if (this.state === 'calibrating') return this.calibrate(lm, t, ev);
+    const F = this.features(lm), B = this.base, o = this.o;
+
+    const drops = [];
+    if (F.sh) drops.push((F.sh.y - B.shY) / B.H);
+    if (F.hip && fin(B.hipY)) drops.push((F.hip.y - B.hipY) / B.H);
+    if (!drops.length) { this.live = { state: this.state + ' (body hidden)' }; return; }
+    const raw = Math.max(...drops);
+    this.sig = this.sig == null ? raw : this.sig + (raw - this.sig) * o.smooth;
+    const sig = this.sig;
+
+    const mid = F.heel && F.toe ? (F.heel.x + F.toe.x) / 2 : B.midX;
+    this.live = { state: this.state, drop: sig };
+
+    // Lowest point of the standing phase marks where the next descent starts.
+    if (this.state !== 'active' && sig <= this.top.sig + 0.01) this.top = { sig: Math.min(sig, this.top.sig), t };
+
+    if (this.state === 'idle' || this.state === 'stuck') {
+      // She walked to a new spot: quietly re-calibrate once she stands still there.
+      if (F.heel && F.toe && Math.abs(mid - B.midX) > 0.6 * B.footLen) { this.startCalibration(true); return; }
+      if (this.state === 'stuck') { if (sig < o.exitDrop) this.state = 'idle'; return; }
+      if (sig < 0.03) { // follow slow drift in standing posture between reps
+        if (F.sh) B.shY += (F.sh.y - B.shY) * 0.02;
+        if (F.hip && fin(B.hipY)) B.hipY += (F.hip.y - B.hipY) * 0.02;
+        if (F.heel) B.heelY += (F.heel.y - B.heelY) * 0.02;
+      }
+      if (sig > o.enterDrop) this.beginRep(F, sig, t, mid);
+      return;
+    }
+
+    if (this.state === 'active') {
+      const r = this.rep;
+      if (sig > r.maxSig) { r.maxSig = sig; r.tBottom = t; this.bottomSnapshot(F); }
+      this.trackDuring(F, mid);
+      if (t - r.tStart > o.maxRepMs) { this.state = 'stuck'; this.rep = null; ev.push({ type: 'discard', reason: 'took too long' }); return; }
+      if (sig < o.exitDrop) { r.tEnd = t; this.state = 'lockout'; this.trackLockout(F); }
+      return;
+    }
+
+    if (this.state === 'lockout') {
+      this.trackLockout(F);
+      if (sig > o.enterDrop) { this.finishRep(ev); this.beginRep(F, sig, t, mid); return; }
+      if (t - this.rep.tEnd >= o.lockoutMs) this.finishRep(ev);
+    }
+  }
+
+  calibrate(lm, t, ev) {
+    if (!this.calib.length || !this.side) this.side = this.o.side === 'auto' ? nearSide(lm) : this.o.side;
+    const F = this.features(lm);
+    if (!F.sh || !F.ank) { this.calib = []; this.calibProgress = 0; this.live = { state: 'calibrating (whole body in frame)' }; return; }
+    const h = bbox(lm, this.o.aspect).h;
+    this.calib.push({ t, F, h });
+    while (this.calib.length && t - this.calib[0].t > this.o.calibMs) this.calib.shift();
+    if (this.calib.length >= 5 && std(this.calib.map(c => c.F.sh.y)) > 0.01 * mean(this.calib.map(c => c.h))) {
+      this.calib = this.calib.slice(-2); this.calibProgress = 0; this.live = { state: 'calibrating (hold still)' }; return;
+    }
+    const span = t - this.calib[0].t;
+    this.calibProgress = clamp(span / this.o.calibMs, 0, 1);
+    this.live = { state: 'calibrating' };
+    if (this.calib.length < 5 || span < this.o.calibMs * 0.9) return;
+
+    const C = this.calib.map(c => c.F);
+    const avg = (fn) => { const v = C.map(fn).filter(fin); return v.length ? mean(v) : NaN; };
+    const shY = avg(c => c.sh.y), ankY = avg(c => c.ank.y), H = ankY - shY;
+    if (!(H > 0.1)) { this.calib = []; this.live = { state: 'calibrating (whole body in frame)' }; return; }
+    let footLen = avg(c => (c.heel && c.toe ? dist(c.heel, c.toe) : NaN));
+    if (!(footLen > 0.02 * H)) footLen = 0.19 * H; // foot not seen: estimate from body size
+    const heelY = avg(c => c.heel?.y ?? NaN);
+    this.base = {
+      shY, H, footLen,
+      hipY: avg(c => c.hip?.y ?? NaN),
+      thighLen: avg(c => (c.hip && c.knee ? dist(c.hip, c.knee) : NaN)),
+      heelY: fin(heelY) ? heelY : ankY + 0.02 * H,
+      midX: avg(c => (c.heel && c.toe ? (c.heel.x + c.toe.x) / 2 : c.ank.x)),
+    };
+    this.state = 'idle'; this.sig = null; this.top = { sig: Infinity, t };
+    ev.push({ type: 'calibrated', side: this.side, recal: this.recal });
+  }
+
+  beginRep(F, sig, t, mid) {
+    this.state = 'active';
+    this.rep = { tStart: this.top.t, tBottom: t, maxSig: sig, depth: null, backAngle: null, heelRise: null, barDrift: null, lockHip: null, lockKnee: null };
+    this.top = { sig: Infinity, t };
+    this.bottomSnapshot(F); this.trackDuring(F, mid);
+  }
+
+  // Depth and back angle are taken at the lowest point. If the hip is hidden there, they're skipped.
+  bottomSnapshot(F) {
+    const r = this.rep, B = this.base;
+    r.depth = F.hip && F.knee ? (F.hip.y - F.knee.y) / (fin(B.thighLen) && B.thighLen > 0 ? B.thighLen : dist(F.hip, F.knee)) : null;
+    r.backAngle = F.hip && F.sh ? Math.atan2(Math.abs(F.sh.x - F.hip.x), F.hip.y - F.sh.y) * 180 / Math.PI : null;
+  }
+
+  trackDuring(F, mid) {
+    const r = this.rep, B = this.base;
+    if (F.heel) r.heelRise = Math.max(r.heelRise ?? -Infinity, (B.heelY - F.heel.y) / B.footLen);
+    if (F.sh) r.barDrift = Math.max(r.barDrift ?? -Infinity, Math.abs(F.sh.x - mid) / B.footLen);
+  }
+
+  trackLockout(F) {
+    const r = this.rep;
+    if (F.sh && F.hip && F.knee) r.lockHip = Math.max(r.lockHip ?? -Infinity, angle2(F.sh, F.hip, F.knee));
+    if (F.hip && F.knee && F.ank) r.lockKnee = Math.max(r.lockKnee ?? -Infinity, angle2(F.hip, F.knee, F.ank));
+  }
+
+  finishRep(ev) {
+    const r = this.rep; this.rep = null; this.state = 'idle';
+    const dur = r.tEnd - r.tStart;
+    if (dur < this.o.minRepMs) { ev.push({ type: 'discard', reason: 'too quick, probably tracking noise' }); return; }
+    const lockout = fin(r.lockHip) && fin(r.lockKnee) ? Math.min(r.lockHip, r.lockKnee) : null;
+    const metrics = {
+      depth: r.depth, backAngle: r.backAngle, heelRise: r.heelRise, barDrift: r.barDrift,
+      descentMs: Math.round(r.tBottom - r.tStart), ascentMs: Math.round(r.tEnd - r.tBottom), lockout, durMs: Math.round(dur),
+    };
+    for (const k of Object.keys(metrics)) if (!fin(metrics[k])) metrics[k] = null;
+    ev.push({ type: 'rep', metrics });
+  }
+}
+
+// The six checks. Default targets are starting guesses to tune on real recordings.
+// better: which direction is good. tol: how far past the target before the sub-score reaches 0.
+const CHECKS = [
+  { key: 'depth',     label: 'Depth',      better: 'high', def: 0,    tol: 0.30, w: 25, unit: '%', cue: 'Go a little lower',               praise: 'Good depth' },
+  { key: 'backAngle', label: 'Chest up',   better: 'low',  def: 45,   tol: 20,   w: 20, unit: '°', cue: 'Keep your chest up',              praise: 'Good chest position' },
+  { key: 'heelRise',  label: 'Heels down', better: 'low',  def: 0.10, tol: 0.15, w: 15, unit: '%', cue: 'Keep your heels down',            praise: 'Heels stayed down' },
+  { key: 'barDrift',  label: 'Bar path',   better: 'low',  def: 0.25, tol: 0.25, w: 15, unit: '%', cue: 'Keep the bar over your mid-foot', praise: 'Good bar path' },
+  { key: 'descentMs', label: 'Lowering',   better: 'high', def: 1000, tol: 600,  w: 15, unit: 's', cue: 'Slower on the way down',          praise: 'Nice slow lowering' },
+  { key: 'lockout',   label: 'Stand up',   better: 'high', def: 165,  tol: 20,   w: 10, unit: '°', cue: 'Stand all the way up',            praise: 'Stood up tall' },
+];
+const SCORE_DEFAULTS = { goodScore: 85, faultPart: 0.5, targets: {} };
+
+function targetFor(M, ref, opts) {
+  if (ref && fin(ref[M.key])) return ref[M.key];
+  if (opts.targets && fin(opts.targets[M.key])) return opts.targets[M.key];
+  return M.def;
+}
+
+// Checks whose landmarks weren't visible (metric null) are skipped, not guessed.
+// "Good rep" needs score >= goodScore AND no single check clearly off (sub-score < faultPart).
+function scoreRep(m, ref, opts = {}) {
+  const o = { ...SCORE_DEFAULTS, ...opts };
+  let tw = 0, ts = 0, worst = null, worstLoss = 0, anyFault = false;
+  const parts = {}, targets = {};
+  for (const M of CHECKS) {
+    const v = m[M.key];
+    if (!fin(v)) continue;
+    const target = targetFor(M, ref, o);
+    const short = M.better === 'high' ? target - v : v - target;
+    const s = clamp(1 - Math.max(0, short) / M.tol, 0, 1);
+    parts[M.key] = s; targets[M.key] = target;
+    tw += M.w; ts += M.w * s;
+    if (s < o.faultPart) anyFault = true;
+    const loss = M.w * (1 - s);
+    if (loss > worstLoss) { worstLoss = loss; worst = M; }
+  }
+  const score = tw ? Math.round(100 * ts / tw) : 0;
+  const good = !worst || (score >= o.goodScore && !anyFault);
+  return { score, parts, targets, cue: good ? 'Good rep' : worst.cue, cueKey: good ? null : worst.key };
+}
+
+function buildReference(repMetrics) {
+  const out = {};
+  for (const M of CHECKS) {
+    const v = repMetrics.map(r => r[M.key]).filter(fin);
+    if (v.length) out[M.key] = median(v);
+  }
+  return out;
+}
+
+// reps: [{score, cue, cueKey, parts}]
+function summarizeSet(reps) {
+  const n = reps.length;
+  if (!n) return { n: 0, avg: 0, workOn: null, didWell: null, speech: 'Set done. No reps counted.' };
+  const avg = Math.round(mean(reps.map(r => r.score)));
+  const counts = {};
+  for (const r of reps) if (r.cueKey) counts[r.cueKey] = (counts[r.cueKey] || 0) + 1;
+  const order = CHECKS.map(M => M.key);
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1] || order.indexOf(a[0]) - order.indexOf(b[0]))[0];
+  const workOn = top ? CHECKS.find(M => M.key === top[0]) : null;
+  let didWell = null, bestAvg = 0.8;
+  for (const M of CHECKS) {
+    if (workOn && M.key === workOn.key) continue;
+    const ps = reps.map(r => r.parts?.[M.key]).filter(fin);
+    if (!ps.length) continue;
+    const a = mean(ps);
+    if (a > bestAvg || (a === bestAvg && !didWell)) { bestAvg = a; didWell = M; }
+  }
+  const lc = s => s[0].toLowerCase() + s.slice(1);
+  const speech = [`Set done. ${n} rep${n === 1 ? '' : 's'}. Score ${avg}.`,
+    didWell ? `${didWell.praise}.` : '',
+    workOn ? `Work on: ${lc(workOn.cue)}.` : 'Great set.'].filter(Boolean).join(' ');
+  return { n, avg, workOn: workOn && { key: workOn.key, cue: workOn.cue }, didWell: didWell && { key: didWell.key, praise: didWell.praise }, speech };
+}
+
+function fmtMetric(key, v) {
+  if (!fin(v)) return '–';
+  const M = CHECKS.find(x => x.key === key);
+  if (!M) return String(Math.round(v));
+  if (M.unit === '%') return Math.round(v * 100) + '%';
+  if (M.unit === 's') return (v / 1000).toFixed(1) + 's';
+  return Math.round(v) + '°';
+}
+// ======================= ANALYSIS-END =======================
+
+// Export for node tests (no-op in the browser)
+globalThis.__squat = { Analyzer, scoreRep, buildReference, summarizeSet, pickPose, nearSide, CHECKS, fmtMetric };
+if (typeof document !== 'undefined') main();
+
+async function main() {
+  const VISION = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3';
+  const MODEL = k => `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_${k}/float16/1/pose_landmarker_${k}.task`;
+  const BONES = [[11, 12], [11, 23], [12, 24], [23, 24], [11, 13], [13, 15], [12, 14], [14, 16], [23, 25], [25, 27], [27, 29], [29, 31], [27, 31],
+    [24, 26], [26, 28], [28, 30], [30, 32], [28, 32]];
+
+  // ---------- storage (localStorage on the phone) ----------
+  const KEY = 'squatcoach.v1';
+  const DEFAULT_SETTINGS = {
+    side: 'auto', speech: true, model: 'full', showDebug: false, numPoses: 3,
+    goodScore: 85, targets: {}, minRepMs: 600, maxRepMs: 10000, lockoutMs: 1000, enterDrop: 0.15, exitDrop: 0.07,
+  };
+  function load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KEY)) || {};
+      return { settings: { ...DEFAULT_SETTINGS, ...(d.settings || {}) }, reference: d.reference || null, sessions: d.sessions || [] };
+    } catch { return { settings: { ...DEFAULT_SETTINGS }, reference: null, sessions: [] }; }
+  }
+  let db = load();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { toast('Could not save: ' + e.message); } }
+  try { navigator.storage?.persist?.(); } catch {}
+
+  // ---------- helpers ----------
+  const $ = id => document.getElementById(id);
+  const screens = ['home', 'goodRep', 'squat', 'summary', 'history', 'detail', 'settings'];
+  function show(id) { screens.forEach(s => $(s).classList.toggle('hidden', s !== id)); window.scrollTo(0, 0); }
+  let toastTimer;
+  function toast(msg, ms = 3000) { const t = $('toast'); t.textContent = msg; t.classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.add('hidden'), ms); }
+  const sClass = s => (s >= 85 ? 'g' : s >= 60 ? 'm' : 'b');
+  const fmtDay = iso => new Date(iso).toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const fmtDate = iso => new Date(iso).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const allReps = s => s.sets.flatMap(x => x.reps);
+  const avgScore = reps => (reps.length ? Math.round(mean(reps.map(r => r.score))) : 0);
+
+  // ---------- speech: slower and at full volume ----------
+  function say(text) {
+    if (!db.settings.speech || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.rate = 0.85; u.volume = 1; u.lang = 'en-US';
+      speechSynthesis.speak(u);
+    } catch {}
+  }
+
+  // ---------- wake lock ----------
+  let wakeLock = null;
+  async function lockScreen() { try { wakeLock = await navigator.wakeLock?.request('screen'); } catch {} }
+  function unlockScreen() { try { wakeLock?.release(); } catch {} wakeLock = null; }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && running) lockScreen(); });
+
+  // ---------- pose model ----------
+  let landmarker = null, landmarkerKey = null;
+  async function ensureLandmarker() {
+    const key = db.settings.model + '/' + db.settings.numPoses;
+    if (landmarker && landmarkerKey === key) return;
+    $('loading').classList.remove('hidden');
+    try {
+      const { PoseLandmarker, FilesetResolver } = await import(`${VISION}/vision_bundle.mjs`);
+      landmarker?.close?.();
+      const vision = await FilesetResolver.forVisionTasks(`${VISION}/wasm`);
+      const opts = d => ({ baseOptions: { modelAssetPath: MODEL(db.settings.model), delegate: d }, runningMode: 'VIDEO',
+        numPoses: db.settings.numPoses, minPoseDetectionConfidence: 0.5, minPosePresenceConfidence: 0.5, minTrackingConfidence: 0.5 });
+      try { landmarker = await PoseLandmarker.createFromOptions(vision, opts('GPU')); }
+      catch { landmarker = await PoseLandmarker.createFromOptions(vision, opts('CPU')); }
+      landmarkerKey = key;
+    } finally { $('loading').classList.add('hidden'); }
+  }
+
+  // ---------- session / set flow ----------
+  const video = $('video'), canvas = $('canvas'), ctx = canvas.getContext('2d');
+  let running = false, stream = null, analyzer = null, session = null, set = null, lastVT = -1, lastTs = 0;
+
+  function newAnalyzer() {
+    const s = db.settings;
+    return new Analyzer({ side: s.side, aspect: (video.videoWidth || 1) / (video.videoHeight || 1),
+      minRepMs: s.minRepMs, maxRepMs: s.maxRepMs, lockoutMs: s.lockoutMs, enterDrop: s.enterDrop, exitDrop: s.exitDrop });
+  }
+
+  async function startSession() {
+    say('Stand tall and still, side-on to the phone.'); // speaking inside the tap unlocks speech on iOS
+    session = { id: Date.now(), date: new Date().toISOString(), usedReference: !!db.reference, sets: [] };
+    show('squat'); resetSquatScreen(true);
+    setStatus('Starting camera…');
+    try {
+      await ensureLandmarker();
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', frameRate: { ideal: 30 } }, audio: false });
+      video.srcObject = stream;
+      await video.play();
+    } catch (e) {
+      console.error(e); stopCamera(); session = null; show('home'); renderHome();
+      toast('The camera could not start. In iPhone Settings → Safari → Camera, choose Allow.', 6000);
+      return;
+    }
+    video.classList.add('mirror'); canvas.classList.add('mirror');
+    beginSet();
+  }
+
+  function beginSet() {
+    set = { n: session.sets.length + 1, startedAt: new Date().toISOString(), reps: [] };
+    analyzer = newAnalyzer(); lastVT = -1;
+    setStatus('Stand tall and still, side-on to the phone');
+    running = true; lockScreen();
+    requestAnimationFrame(loop);
+  }
+
+  function resetSquatScreen(firstSet) {
+    $('repCount').textContent = '0'; $('repLbl').textContent = 'reps'; $('cue').textContent = '';
+    $('volume').classList.toggle('hidden', !firstSet);
+    $('debug').classList.toggle('hidden', !db.settings.showDebug);
+    $('stage').className = 'stage';
+  }
+
+  function setStatus(s) { $('squatStatus').textContent = s; }
+
+  function loop() {
+    if (!running) return;
+    requestAnimationFrame(loop);
+    if (video.readyState < 2 || video.currentTime === lastVT) return;
+    lastVT = video.currentTime;
+    let ts = performance.now(); if (ts <= lastTs) ts = lastTs + 1; lastTs = ts; // detectForVideo needs increasing timestamps
+    let res;
+    try { res = landmarker.detectForVideo(video, ts); } catch (e) { console.error(e); return; }
+    if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight; analyzer.o.aspect = canvas.width / canvas.height;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const poses = res.landmarks || [];
+    const events = analyzer.push(poses, ts);
+    const her = analyzer.lastIdx;
+    if (her >= 0) drawSkeleton(poses[her]);
+    const seen = her >= 0 && !analyzer.lost;
+    $('stage').className = 'stage ' + (seen ? 'seen' : 'notseen');
+    for (const e of events) handle(e);
+    if (analyzer.state === 'calibrating') {
+      const st = analyzer.live.state || '';
+      setStatus(!seen ? 'Step into the picture, head to feet'
+        : st.includes('hold') ? 'Hold still'
+        : st.includes('whole') ? 'Step back so I can see your feet'
+        : `Getting ready… ${Math.round(analyzer.calibProgress * 100)}%`);
+    }
+    if (db.settings.showDebug) renderDebug();
+  }
+
+  function drawSkeleton(lm) {
+    const W = canvas.width, H = canvas.height;
+    ctx.lineWidth = Math.max(4, W / 120); ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    for (const [a, b] of BONES) { ctx.beginPath(); ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); ctx.stroke(); }
+    ctx.fillStyle = '#ffd60a';
+    for (let i = 11; i < lm.length; i++) { ctx.beginPath(); ctx.arc(lm[i].x * W, lm[i].y * H, Math.max(4, W / 160), 0, 7); ctx.fill(); }
+  }
+
+  function renderDebug() {
+    const L = analyzer.live || {};
+    $('debug').textContent = `state ${L.state || ''}\nside  ${analyzer.side || '?'}\ndrop  ${fin(L.drop) ? Math.round(L.drop * 100) + '%' : '–'}`;
+  }
+
+  function handle(ev) {
+    if (ev.type === 'calibrated') {
+      if (ev.recal) { setStatus('Ready'); return; }
+      $('volume').classList.add('hidden');
+      setStatus('Squat when you\'re ready');
+      say('Ready. Squat when you\'re ready.');
+    } else if (ev.type === 'lost') {
+      setStatus('I can\'t see you'); say('I can\'t see you.');
+    } else if (ev.type === 'found') {
+      setStatus(analyzer.state === 'calibrating' ? '' : 'Squat when you\'re ready');
+    } else if (ev.type === 'discard') {
+      setStatus('That one didn\'t count');
+    } else if (ev.type === 'rep') {
+      const sc = scoreRep(ev.metrics, db.reference?.metrics, db.settings);
+      const rep = { n: set.reps.length + 1, t: Date.now(), metrics: ev.metrics, parts: sc.parts, score: sc.score, cue: sc.cue, cueKey: sc.cueKey };
+      set.reps.push(rep);
+      $('repCount').textContent = rep.n; $('repLbl').textContent = rep.n === 1 ? 'rep' : 'reps';
+      $('cue').textContent = rep.cue; $('cue').className = sc.cueKey ? '' : 's-g';
+      setStatus('');
+      say(rep.cue);
+    }
+  }
+
+  function endSet() {
+    running = false;
+    const sum = summarizeSet(set.reps);
+    set.summary = { avg: sum.avg, workOn: sum.workOn, didWell: sum.didWell };
+    if (set.reps.length) {
+      session.sets.push(set);
+      if (!db.sessions.some(s => s.id === session.id)) db.sessions.unshift(session);
+      save();
+    }
+    $('sumTitle').textContent = `Set ${set.n} done`;
+    $('sumBody').innerHTML = !sum.n ? '<p class="card">No squats were counted in this set.</p>' : `
+      <div class="card stats">
+        <div><div class="muted">Reps</div><div class="big-num">${sum.n}</div></div>
+        <div><div class="muted">Score</div><div class="big-num s-${sClass(sum.avg)}">${sum.avg}</div></div>
+      </div>
+      <div class="card"><div class="muted">Did well</div><div style="font-size:32px;font-weight:700">${esc(sum.didWell?.praise || 'Good effort')}</div></div>
+      <div class="card"><div class="muted">Work on</div><div style="font-size:32px;font-weight:700">${esc(sum.workOn?.cue || 'Nothing. Great set!')}</div></div>`;
+    show('summary');
+    say(sum.speech);
+  }
+
+  function stopCamera() {
+    running = false; unlockScreen();
+    try { stream?.getTracks().forEach(t => t.stop()); } catch {}
+    stream = null; video.pause(); video.srcObject = null;
+  }
+
+  function finishSession() {
+    stopCamera();
+    try { speechSynthesis.cancel(); } catch {}
+    const s = session; session = null; set = null;
+    if (s && s.sets.length) openDetail(s.id, 'home');
+    else { show('home'); renderHome(); }
+  }
+
+  // ---------- home ----------
+  function referenceLine() {
+    const r = db.reference;
+    return r ? `Using: your good rep from ${fmtDay(r.repDate || r.date)}` : 'Using: default targets';
+  }
+  function renderHome() {
+    $('usingLine').textContent = referenceLine();
+    const standalone = window.navigator.standalone || window.matchMedia?.('(display-mode: standalone)').matches;
+    $('a2hsCard').classList.toggle('hidden', !!standalone);
+  }
+
+  // ---------- history ----------
+  function renderHistory() {
+    $('historyBody').innerHTML = !db.sessions.length ? '<p class="card">No sessions yet. Tap Start on the home screen to begin.</p>'
+      : db.sessions.map(s => {
+        const reps = allReps(s), avg = avgScore(reps);
+        return `<button class="card" style="text-align:left" data-sid="${s.id}">
+          <div>${esc(fmtDate(s.date))}</div>
+          <div style="font-size:24px;font-weight:400" class="muted">${s.sets.length} set${s.sets.length === 1 ? '' : 's'} · ${reps.length} reps · score <span class="s-${sClass(avg)}">${avg}</span></div></button>`;
+      }).join('');
+    $('historyBody').querySelectorAll('[data-sid]').forEach(b => b.onclick = () => openDetail(+b.dataset.sid, 'history'));
+  }
+
+  let detailFrom = 'history';
+  function setReference(metrics, repDate, source) {
+    db.reference = { metrics, repDate, source, date: new Date().toISOString() };
+    save(); toast('Saved. Your squats will now be scored against this.'); renderHome();
+  }
+
+  function openDetail(id, from) {
+    const s = db.sessions.find(x => x.id === id); if (!s) { show('home'); renderHome(); return; }
+    detailFrom = from;
+    const reps = allReps(s), avg = avgScore(reps);
+    $('detailTitle').textContent = fmtDate(s.date);
+    let h = `<div class="card stats">
+      <div><div class="muted">Sets</div><div class="big-num">${s.sets.length}</div></div>
+      <div><div class="muted">Reps</div><div class="big-num">${reps.length}</div></div>
+      <div><div class="muted">Score</div><div class="big-num s-${sClass(avg)}">${avg}</div></div></div>`;
+    if (!s.usedReference) h += '<p class="muted">Scored against the default targets.</p>';
+    h += s.sets.map((st, si) => `<div class="card">
+      <h2 style="margin-top:0">Set ${st.n}: ${st.reps.length} reps · <span class="s-${sClass(st.summary?.avg ?? 0)}">${st.summary?.avg ?? avgScore(st.reps)}</span></h2>
+      ${st.summary?.didWell ? `<p>Did well: ${esc(st.summary.didWell.praise)}</p>` : ''}
+      <p>Work on: ${esc(st.summary?.workOn?.cue || 'nothing, great set')}</p>
+      ${st.reps.map((r, ri) => `<div class="rep"><div>Rep ${r.n}: <b class="s-${sClass(r.score)}">${r.score}</b> · <span class="muted">${esc(r.cue)}</span></div>
+        <button data-rep="${si}:${ri}">Use as my good rep</button></div>`).join('')}
+      <button data-set="${si}">Use this set as my good rep</button></div>`).join('');
+    h += '<button class="danger" id="delSession">Delete this session</button>';
+    $('detailBody').innerHTML = h;
+    $('detailBody').querySelectorAll('[data-rep]').forEach(b => b.onclick = () => {
+      const [si, ri] = b.dataset.rep.split(':').map(Number), r = s.sets[si].reps[ri];
+      setReference(buildReference([r.metrics]), s.date, `set ${si + 1}, rep ${r.n}`);
+    });
+    $('detailBody').querySelectorAll('[data-set]').forEach(b => b.onclick = () => {
+      const st = s.sets[+b.dataset.set];
+      const best = [...st.reps].sort((a, c) => c.score - a.score).slice(0, 3);
+      setReference(buildReference(best.map(r => r.metrics)), s.date, `best ${best.length} reps of set ${st.n}`);
+    });
+    $('delSession').onclick = () => { if (confirm('Delete this session?')) { db.sessions = db.sessions.filter(x => x.id !== id); save(); renderHistory(); show('history'); } };
+    show('detail');
+  }
+  $('detailBack').onclick = () => { if (detailFrom === 'history') { renderHistory(); show('history'); } else { show('home'); renderHome(); } };
+
+  // ---------- settings ----------
+  const BASIC = [
+    ['side', 'Side facing the phone', 'Auto picks the side it sees best', 'select', [['auto', 'Auto'], ['left', 'My left'], ['right', 'My right']]],
+    ['speech', 'Speak tips out loud', '', 'check'],
+  ];
+  // [key, label, hint, scale for display]
+  const TARGET_FIELDS = [
+    ['depth', 'Depth target (%)', '0 = hip level with knee; below 0 = above parallel', 100],
+    ['backAngle', 'Max forward lean (°)', 'From upright', 1],
+    ['heelRise', 'Max heel lift (% of foot)', '', 100],
+    ['barDrift', 'Max bar drift (% of foot)', '', 100],
+    ['descentMs', 'Min lowering time (s)', '', 0.001],
+    ['lockout', 'Lockout angle (°)', 'Hip and knee at the top', 1],
+  ];
+  const ADV = [
+    ['goodScore', '"Good rep" score', 'At or above this (and no clear fault)', 1],
+    ['minRepMs', 'Shortest rep (s)', '', 0.001],
+    ['maxRepMs', 'Longest rep (s)', '', 0.001],
+    ['lockoutMs', 'Time to stand up after a rep (s)', '', 0.001],
+  ];
+  const field = (label, hint, input) => `<label class="field"><span>${label}${hint ? `<small>${hint}</small>` : ''}</span>${input}</label>`;
+  const num = (attrs, v) => `<input type="number" inputmode="decimal" step="any" ${attrs} value="${+v.toFixed(3)}">`;
+
+  function renderSettings() {
+    $('settingsBody').innerHTML = BASIC.map(([k, label, hint, type, opts]) => field(label, hint, type === 'select'
+      ? `<select data-k="${k}">${opts.map(([val, t]) => `<option value="${val}" ${val === db.settings[k] ? 'selected' : ''}>${t}</option>`).join('')}</select>`
+      : `<input type="checkbox" data-k="${k}" ${db.settings[k] ? 'checked' : ''}>`)).join('');
+    $('settingsBody').querySelectorAll('[data-k]').forEach(el => el.onchange = () => {
+      db.settings[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value; save();
+    });
+    renderAdvanced();
+  }
+
+  function renderAdvanced() {
+    const T = db.settings.targets || {};
+    $('advancedBody').innerHTML =
+      '<p class="muted">Targets used when you have no good rep saved.</p>' +
+      TARGET_FIELDS.map(([k, label, hint, sc]) => field(label, hint, num(`data-t="${k}" data-sc="${sc}"`, (fin(T[k]) ? T[k] : CHECKS.find(M => M.key === k).def) * sc))).join('') +
+      ADV.map(([k, label, hint, sc]) => field(label, hint, num(`data-a="${k}" data-sc="${sc}"`, db.settings[k] * sc))).join('') +
+      field('Pose model', 'Lite is faster, Full is more accurate', `<select id="modelSel">${['lite', 'full', 'heavy'].map(m => `<option ${m === db.settings.model ? 'selected' : ''}>${m}</option>`).join('')}</select>`) +
+      field('Show live numbers', 'For tuning', `<input type="checkbox" id="debugChk" ${db.settings.showDebug ? 'checked' : ''}>`) +
+      '<button id="resetAdv">Reset advanced to defaults</button>';
+    $('advancedBody').querySelectorAll('[data-t]').forEach(el => el.onchange = () => {
+      const v = Number(el.value) / Number(el.dataset.sc); if (!fin(v)) return;
+      db.settings.targets = { ...(db.settings.targets || {}), [el.dataset.t]: v }; save();
+    });
+    $('advancedBody').querySelectorAll('[data-a]').forEach(el => el.onchange = () => {
+      const v = Number(el.value) / Number(el.dataset.sc); if (!fin(v)) return;
+      db.settings[el.dataset.a] = v; save();
+    });
+    $('modelSel').onchange = e => { db.settings.model = e.target.value; save(); };
+    $('debugChk').onchange = e => { db.settings.showDebug = e.target.checked; save(); };
+    $('resetAdv').onclick = () => {
+      const keep = { side: db.settings.side, speech: db.settings.speech };
+      db.settings = { ...DEFAULT_SETTINGS, ...keep }; save(); renderSettings(); toast('Advanced settings reset');
+    };
+  }
+
+  // ---------- wiring ----------
+  $('startBtn').onclick = startSession;
+  $('setDoneBtn').onclick = endSet;
+  $('nextSetBtn').onclick = () => { say('Stand tall and still, side-on to the phone.'); show('squat'); resetSquatScreen(false); beginSet(); };
+  $('finishBtn').onclick = finishSession;
+  $('historyBtn').onclick = () => { renderHistory(); show('history'); };
+  $('goodRepBtn').onclick = () => { $('goodRepNow').textContent = referenceLine(); show('goodRep'); };
+  $('goodRepHistBtn').onclick = () => { renderHistory(); show('history'); };
+  $('settingsBtn').onclick = () => { renderSettings(); $('advancedBody').classList.add('hidden'); show('settings'); };
+  $('advancedBtn').onclick = () => $('advancedBody').classList.toggle('hidden');
+  document.querySelectorAll('.backBtn').forEach(b => b.onclick = () => { show('home'); renderHome(); });
+  $('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `squat-coach-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  };
+  $('clearRefBtn').onclick = () => { if (confirm('Go back to the default targets?')) { db.reference = null; save(); renderHome(); toast('Using the default targets'); } };
+  $('clearAllBtn').onclick = () => {
+    if (confirm('Delete ALL your sessions, your good rep and settings? This can\'t be undone.')) {
+      db = { settings: { ...DEFAULT_SETTINGS }, reference: null, sessions: [] }; save(); renderSettings(); renderHome(); toast('All data deleted');
+    }
+  };
+
+  renderHome();
+}
+</script>
+</body>
+</html>
